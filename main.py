@@ -1,5 +1,5 @@
 import os
-import sys
+import argparse
 from dotenv import load_dotenv
 from google import genai
 
@@ -11,19 +11,26 @@ model_name = "gemini-2.0-flash-001"
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 2:
-        content = sys.argv[1]
-    else:
-        print("Usage: python3 main.py <content>")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description='Generate content using Gemini AI')
+    parser.add_argument('prompt', help='The prompt to send to the AI')
+    parser.add_argument('--verbose', '-v', action='store_true', 
+                       help='Enable verbose output with token usage information')
+    
+    args = parser.parse_args()
+    prompt = args.prompt
+
+    messages = [genai.types.Content(role="user", parts=[genai.types.Part(text=prompt)]),]
 
     response = client.models.generate_content(
         model=model_name,
-        contents=content
+        contents=messages
 
     )
     print(response.text)
-    print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
-    print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
+    
+    if args.verbose:
+        print(f"User prompt: {prompt}")
+        print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
+        print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
 
 
