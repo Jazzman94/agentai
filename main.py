@@ -4,6 +4,11 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
+from functions.get_files_info import get_files_info
+from functions.get_file_content import get_file_content
+from functions.run_python import run_python_file
+from functions.write_file import write_file
+
 load_dotenv()
 api_key = os.environ.get("GEMINI_API_KEY")
 
@@ -93,6 +98,47 @@ available_functions = types.Tool(
     ]
 )
 
+def call_function(function_call_part: types.FunctionCall, verbose=False):
+    function_name = function_call_part.name
+    args = function_call_part.args
+
+    if verbose:
+        print(f"Calling function: {function_name}({args})")
+    else:
+        print(f" - Calling function: {function_name}")
+    
+    args["working_directory"] = "./calculator"
+
+    if function_name == "get_files_info":
+        response = get_files_info(**args)
+    elif function_name == "get_file_content":
+        response = get_file_content(**args)
+    elif function_name == "run_python_file":
+        response = run_python_file(**args)
+    elif function_name == "write_file":
+        response = write_file(**args)
+    else:
+        return types.Content(
+            role="tool",
+            parts=[
+                types.Part.from_function_response(
+                name=function_name,
+                response={"error": f"Unknown function: {function_name}"},
+                )
+            ],
+        )
+
+    return types.Content(
+        role="tool",
+        parts=[
+            types.Part.from_function_response(
+                name=function_name,
+                response={"result": response},
+            )
+        ],
+    )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate content using Gemini AI')
     parser.add_argument('prompt', help='The prompt to send to the AI')
@@ -111,7 +157,12 @@ if __name__ == "__main__":
     )
     if response.function_calls:
         for function_call_part in response.function_calls:
-            print(f"Calling function: {function_call_part.name}({function_call_part.args})")
+            function_call_result = call_function(function_call_part, verbose=args.verbose)
+            if not function_call_result.parts[0].function_response.response:
+                raise ValueError(f"Function {function_call_part.name} returned no response")
+            if args.verbose:
+                print(f"-> {function_call_result.parts[0].function_response.response}")
+            
     else:
         print(response.text)
     
